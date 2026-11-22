@@ -1,0 +1,12 @@
+{
+    "name": "Inventory & Reservations",
+    "purpose": "Synthetic inventory service: products with available stock and reservations that hold units. It runs as the managed test sandbox, so investigations never touch a real system.",
+    "target": {"kind": "managed_sandbox"},
+    "endpoints": [
+        {"method": "GET", "path": "/products/{product_id}", "purpose": "Returns a product with its identifier and available stock."},
+        {"method": "POST", "path": "/reservations", "purpose": "Creates a reservation and deducts the reserved units from stock."},
+        {"method": "GET", "path": "/reservations/{reservation_id}", "purpose": "Returns the current state of a reservation."},
+        {"method": "POST", "path": "/reservations/{reservation_id}/cancel", "purpose": "Cancels a reservation and returns its units to stock."}
+    ],
+    "requirements": "specifications/target_app/v1/requirements.json"
+}

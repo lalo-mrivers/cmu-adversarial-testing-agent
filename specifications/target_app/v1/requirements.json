@@ -1,0 +1,145 @@
+{
+    "specification_version": "v1",
+    "requirements": [
+        {
+            "id": "REQ-PRODUCT-001",
+            "description": "Check the current stock of a product.",
+            "operations": [
+                {
+                    "method": "GET",
+                    "path": "/products/{product_id}"
+                }
+            ],
+            "preconditions": [],
+            "expected_behavior": "If the product exists, respond with HTTP 200 and a JSON object containing id and available_quantity. id must match the product_id in the path and available_quantity must be a non-negative integer representing the current stock. The query must not modify products or reservations.",
+            "exceptions": [
+                {
+                    "id": "PRODUCT_NOT_FOUND",
+                    "condition": "There is no product with the requested identifier.",
+                    "expected_behavior": "Respond with HTTP 404 and error.code equal to PRODUCT_NOT_FOUND. Do not modify products or reservations."
+                }
+            ]
+        },
+        {
+            "id": "REQ-RESERVATION-001",
+            "description": "Validate the reservation request before checking or modifying inventory.",
+            "operations": [
+                {
+                    "method": "POST",
+                    "path": "/reservations"
+                }
+            ],
+            "preconditions": [],
+            "expected_behavior": "The body must be a JSON object with exactly the fields product_id and quantity. product_id must be a string matching the pattern ^[A-Za-z0-9_-]+$. quantity must be a positive JSON integer, written without a decimal part or exponent; booleans are not valid quantities. Objects with duplicate keys and NaN or Infinity values are not allowed. A valid body continues to REQ-RESERVATION-002; this validation does not modify products or reservations.",
+            "exceptions": [
+                {
+                    "id": "INVALID_JSON",
+                    "condition": "The body is empty, is not valid JSON, contains duplicate keys, or contains non-finite numbers.",
+                    "expected_behavior": "Respond with HTTP 400 and error.code equal to INVALID_JSON. Do not create reservations or modify stock. This check precedes all other validations."
+                },
+                {
+                    "id": "INVALID_REQUEST",
+                    "condition": "The body is valid, unambiguous JSON, but violates the required object structure, fields, or types and values.",
+                    "expected_behavior": "Respond with HTTP 422 and error.code equal to INVALID_REQUEST. Do not create reservations or modify stock. Validate the body before checking whether the product exists."
+                }
+            ]
+        },
+        {
+            "id": "REQ-RESERVATION-002",
+            "description": "Create an active reservation and deduct its units from inventory.",
+            "operations": [
+                {
+                    "method": "POST",
+                    "path": "/reservations"
+                }
+            ],
+            "preconditions": [
+                "The request satisfies REQ-RESERVATION-001."
+            ],
+            "expected_behavior": "If the product exists and available_quantity is greater than or equal to quantity, respond with HTTP 201 and a JSON object containing id, product_id, quantity, and status. Generate a unique id within the sandbox that matches ^[A-Za-z0-9_-]+$, preserve the requested product and quantity, and set status to ACTIVE. Create the reservation and deduct exactly quantity units as a single atomic operation. The reservation must be immediately queryable by its id. Each valid new request creates a distinct reservation if stock remains; no request deduplication is offered.",
+            "exceptions": [
+                {
+                    "id": "PRODUCT_NOT_FOUND",
+                    "condition": "The requested product does not exist.",
+                    "expected_behavior": "Respond with HTTP 404 and error.code equal to PRODUCT_NOT_FOUND. Do not create reservations or modify stock."
+                },
+                {
+                    "id": "INSUFFICIENT_STOCK",
+                    "condition": "The product exists, but available_quantity is less than quantity.",
+                    "expected_behavior": "Respond with HTTP 409 and error.code equal to INSUFFICIENT_STOCK. Do not create reservations, do not partially decrement the quantity, and do not modify other reservations or products."
+                }
+            ]
+        },
+        {
+            "id": "REQ-RESERVATION-003",
+            "description": "Query a reservation and observe its persisted state.",
+            "operations": [
+                {
+                    "method": "GET",
+                    "path": "/reservations/{reservation_id}"
+                }
+            ],
+            "preconditions": [],
+            "expected_behavior": "If the reservation exists, respond with HTTP 200 and a JSON object containing id, product_id, quantity, and status. id must match the reservation_id in the path. product_id and quantity must retain the values recorded at creation time. status must be ACTIVE or CANCELLED and reflect the latest completed operation. Cancelled reservations remain queryable until the sandbox is reset. The query does not modify products or reservations.",
+            "exceptions": [
+                {
+                    "id": "RESERVATION_NOT_FOUND",
+                    "condition": "There is no reservation with the requested identifier.",
+                    "expected_behavior": "Respond with HTTP 404 and error.code equal to RESERVATION_NOT_FOUND. Do not modify products or reservations."
+                }
+            ]
+        },
+        {
+            "id": "REQ-RESERVATION-004",
+            "description": "Cancel a reservation and restore its units exactly once.",
+            "operations": [
+                {
+                    "method": "POST",
+                    "path": "/reservations/{reservation_id}/cancel"
+                }
+            ],
+            "preconditions": [],
+            "expected_behavior": "If the reservation exists and is ACTIVE, change its status to CANCELLED and return exactly its quantity to the associated product's available_quantity as a single atomic operation. Respond with HTTP 200 and a JSON object containing id, product_id, quantity, and status equal to CANCELLED. Preserve id, product_id, and quantity. The operation is determined exclusively by reservation_id in the path and the persisted data: any request body is ignored and cannot replace the product, quantity, or status of the reservation.",
+            "exceptions": [
+                {
+                    "id": "ALREADY_CANCELLED",
+                    "condition": "The reservation exists and is already CANCELLED.",
+                    "expected_behavior": "Respond with HTTP 200 with the same id, product_id, quantity, and status equal to CANCELLED. Do not increase stock or modify any reservation. Repeating the cancellation has the same effect as executing it once."
+                },
+                {
+                    "id": "RESERVATION_NOT_FOUND",
+                    "condition": "There is no reservation with the requested identifier.",
+                    "expected_behavior": "Respond with HTTP 404 and error.code equal to RESERVATION_NOT_FOUND. Do not modify products or reservations."
+                }
+            ]
+        },
+        {
+            "id": "REQ-INVENTORY-001",
+            "description": "Preserve inventory units throughout a sequence of operations.",
+            "operations": [
+                {
+                    "method": "GET",
+                    "path": "/products/{product_id}"
+                },
+                {
+                    "method": "POST",
+                    "path": "/reservations"
+                },
+                {
+                    "method": "GET",
+                    "path": "/reservations/{reservation_id}"
+                },
+                {
+                    "method": "POST",
+                    "path": "/reservations/{reservation_id}/cancel"
+                }
+            ],
+            "preconditions": [
+                "The investigation begins after resetting the sandbox to a known initial state, with no reservations and with non-negative integer stock.",
+                "No external process modifies the sandbox, and its state is not reset during the sequence."
+            ],
+            "expected_behavior": "After each completed operation, for each product, available_quantity must equal its initial stock minus the sum of quantity of its ACTIVE reservations. CANCELLED reservations do not deduct units. available_quantity can never be negative or exceed the initial stock. Read operations and rejected requests must preserve all products and reservations. An operation on one product must not modify the stock or reservations of another.",
+            "exceptions": []
+        }
+    ]
+}

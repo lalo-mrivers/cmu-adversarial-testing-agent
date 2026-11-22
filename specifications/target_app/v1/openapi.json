@@ -1,0 +1,480 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+        "title": "Inventory Reservation Sandbox API",
+        "version": "v1",
+        "description": "HTTP contract for the controlled reservation application. Business rules and their preconditions are defined in requirements.json, version v1. Validation of the body of POST /reservations occurs before product lookup and stock checks."
+    },
+    "paths": {
+        "/products/{product_id}": {
+            "get": {
+                "operationId": "getProduct",
+                "summary": "Check product stock",
+                "description": "Returns the current stock without modifying products or reservations.",
+                "x-requirement-ids": [
+                    "REQ-PRODUCT-001",
+                    "REQ-INVENTORY-001"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/ProductId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Product found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Product"
+                                },
+                                "example": {
+                                    "id": "product-001",
+                                    "available_quantity": 10
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ProductNotFound"
+                    }
+                }
+            }
+        },
+        "/reservations": {
+            "post": {
+                "operationId": "createReservation",
+                "summary": "Create a reservation",
+                "description": "Creates an ACTIVE reservation and atomically deducts its units. Each valid request creates a distinct reservation if stock is available; there is no deduplication. Rejected requests do not modify state. The JSON validity is checked first, then its structure and values, then product existence, and finally stock availability.",
+                "x-requirement-ids": [
+                    "REQ-RESERVATION-001",
+                    "REQ-RESERVATION-002",
+                    "REQ-INVENTORY-001"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Unambiguous JSON object. A missing, empty, malformed body, one with duplicate keys, or one with non-finite numbers produces HTTP 400. A valid JSON that violates the schema or the lexical representation of quantity produces HTTP 422.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateReservationRequest"
+                            },
+                            "example": {
+                                "product_id": "product-001",
+                                "quantity": 3
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Reservation created and available for lookup.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ActiveReservation"
+                                },
+                                "example": {
+                                    "id": "reservation-001",
+                                    "product_id": "product-001",
+                                    "quantity": 3,
+                                    "status": "ACTIVE"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "$ref": "#/components/responses/InvalidJson"
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ProductNotFound"
+                    },
+                    "409": {
+                        "$ref": "#/components/responses/InsufficientStock"
+                    },
+                    "422": {
+                        "$ref": "#/components/responses/InvalidRequest"
+                    }
+                }
+            }
+        },
+        "/reservations/{reservation_id}": {
+            "get": {
+                "operationId": "getReservation",
+                "summary": "Query a reservation",
+                "description": "Returns the persisted state without modifying it. CANCELLED reservations remain available until the sandbox is reset.",
+                "x-requirement-ids": [
+                    "REQ-RESERVATION-003",
+                    "REQ-INVENTORY-001"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/ReservationId"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Reservation found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Reservation"
+                                },
+                                "example": {
+                                    "id": "reservation-001",
+                                    "product_id": "product-001",
+                                    "quantity": 3,
+                                    "status": "ACTIVE"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ReservationNotFound"
+                    }
+                }
+            }
+        },
+        "/reservations/{reservation_id}/cancel": {
+            "post": {
+                "operationId": "cancelReservation",
+                "summary": "Cancel a reservation",
+                "description": "An ACTIVE reservation becomes CANCELLED and its units are restored atomically. If it is already CANCELLED, it returns HTTP 200 without restoring additional units. It preserves id, product_id, and quantity. The result depends on reservation_id and the persisted data; any request body received is ignored.",
+                "x-requirement-ids": [
+                    "REQ-RESERVATION-004",
+                    "REQ-INVENTORY-001"
+                ],
+                "parameters": [
+                    {
+                        "$ref": "#/components/parameters/ReservationId"
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "description": "Optional. Completely ignored: it is neither interpreted nor validated, even if it contains malformed JSON.",
+                    "content": {
+                        "*/*": {
+                            "schema": {}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Reservation cancelled or already cancelled.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CancelledReservation"
+                                },
+                                "example": {
+                                    "id": "reservation-001",
+                                    "product_id": "product-001",
+                                    "quantity": 3,
+                                    "status": "CANCELLED"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "$ref": "#/components/responses/ReservationNotFound"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "parameters": {
+            "ProductId": {
+                "name": "product_id",
+                "in": "path",
+                "required": true,
+                "description": "Identifier of the product to query.",
+                "schema": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "example": "product-001"
+            },
+            "ReservationId": {
+                "name": "reservation_id",
+                "in": "path",
+                "required": true,
+                "description": "Identifier returned when creating a reservation.",
+                "schema": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "example": "reservation-001"
+            }
+        },
+        "schemas": {
+            "Identifier": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "PositiveQuantity": {
+                "type": "integer",
+                "minimum": 1
+            },
+            "Product": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "available_quantity"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Identifier"
+                    },
+                    "available_quantity": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            },
+            "CreateReservationRequest": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                    "product_id",
+                    "quantity"
+                ],
+                "properties": {
+                    "product_id": {
+                        "$ref": "#/components/schemas/Identifier"
+                    },
+                    "quantity": {
+                        "$ref": "#/components/schemas/PositiveQuantity",
+                        "description": "The application requires a positive integer token without a decimal point or exponent. It rejects 1.0 and 1e0 even though JSON Schema may consider them integers. It also rejects booleans, strings, null, zero, and negative numbers. The lexical constraint must be validated when processing the original body."
+                    }
+                }
+            },
+            "Reservation": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "product_id",
+                    "quantity",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "$ref": "#/components/schemas/Identifier"
+                    },
+                    "product_id": {
+                        "$ref": "#/components/schemas/Identifier"
+                    },
+                    "quantity": {
+                        "$ref": "#/components/schemas/PositiveQuantity"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "ACTIVE",
+                            "CANCELLED"
+                        ]
+                    }
+                }
+            },
+            "ActiveReservation": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Reservation"
+                    },
+                    {
+                        "properties": {
+                            "status": {
+                                "const": "ACTIVE"
+                            }
+                        }
+                    }
+                ]
+            },
+            "CancelledReservation": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Reservation"
+                    },
+                    {
+                        "properties": {
+                            "status": {
+                                "const": "CANCELLED"
+                            }
+                        }
+                    }
+                ]
+            },
+            "Error": {
+                "type": "object",
+                "required": [
+                    "error"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "object",
+                        "required": [
+                            "code"
+                        ],
+                        "properties": {
+                            "code": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "responses": {
+            "InvalidJson": {
+                "description": "Missing, empty, malformed, ambiguous body due to duplicate keys, or body with non-finite numbers. Does not modify state.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                {
+                                    "properties": {
+                                        "error": {
+                                            "properties": {
+                                                "code": {
+                                                    "const": "INVALID_JSON"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "example": {
+                            "error": {
+                                "code": "INVALID_JSON"
+                            }
+                        }
+                    }
+                }
+            },
+            "InvalidRequest": {
+                "description": "Valid JSON that violates required fields, types, values, or the lexical representation of quantity. Does not modify state.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                {
+                                    "properties": {
+                                        "error": {
+                                            "properties": {
+                                                "code": {
+                                                    "const": "INVALID_REQUEST"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "example": {
+                            "error": {
+                                "code": "INVALID_REQUEST"
+                            }
+                        }
+                    }
+                }
+            },
+            "ProductNotFound": {
+                "description": "The product does not exist. Does not modify state.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                {
+                                    "properties": {
+                                        "error": {
+                                            "properties": {
+                                                "code": {
+                                                    "const": "PRODUCT_NOT_FOUND"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "example": {
+                            "error": {
+                                "code": "PRODUCT_NOT_FOUND"
+                            }
+                        }
+                    }
+                }
+            },
+            "InsufficientStock": {
+                "description": "The product exists but does not have enough units. Does not create reservations or perform partial deductions.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                {
+                                    "properties": {
+                                        "error": {
+                                            "properties": {
+                                                "code": {
+                                                    "const": "INSUFFICIENT_STOCK"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "example": {
+                            "error": {
+                                "code": "INSUFFICIENT_STOCK"
+                            }
+                        }
+                    }
+                }
+            },
+            "ReservationNotFound": {
+                "description": "The reservation does not exist. Does not modify state.",
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/components/schemas/Error"
+                                },
+                                {
+                                    "properties": {
+                                        "error": {
+                                            "properties": {
+                                                "code": {
+                                                    "const": "RESERVATION_NOT_FOUND"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        "example": {
+                            "error": {
+                                "code": "RESERVATION_NOT_FOUND"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

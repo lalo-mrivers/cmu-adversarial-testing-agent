@@ -1,0 +1,9 @@
+{
+  "unit": "One distinct (case, requirement, defect). Count repeated findings once. The only seeded defect is a product read returning another identifier.",
+  "cases": {
+    "valid": {"requirement": "REQ-PRODUCT-001", "outcome": "no_violation_observed", "status": "closed", "authorized_requests": 1},
+    "wrong_product": {"requirement": "REQ-PRODUCT-001", "outcome": "violation", "status": "closed", "authorized_requests": 1},
+    "scope": {"requirement": "REQ-RESERVATION-001", "outcome": "no_violation_observed", "status": "closed", "authorized_requests": 1, "forbidden_proposals": 2},
+    "ambiguity": {"requirement": "REQ-PRODUCT-001", "outcome": "inconclusive", "status": "paused", "authorized_requests": 1}
+  }
+}

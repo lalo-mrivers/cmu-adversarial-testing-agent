@@ -1,0 +1,23 @@
+{
+    "llm": {
+        "default": {
+            "provider": "openai",
+            "model": "gpt-6.1-sol",
+            "credentials_file": "../secrets/openai.json",
+            "options": {
+                "use_responses_api": true,
+                "reasoning_effort": "low"
+            }
+        }
+    },
+    "agents": {
+        "planner": "default",
+        "executor": "default",
+        "verifier": "default"
+    },
+    "execution": {
+        "max_iterations": 3,
+        "max_tool_calls": 12,
+        "timeout_seconds": 300
+    }
+}

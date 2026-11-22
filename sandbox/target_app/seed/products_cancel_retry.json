@@ -1,0 +1,19 @@
+{
+    "products": [
+        {
+            "id": "product-001",
+            "available_quantity": 10
+        },
+        {
+            "id": "product-002",
+            "available_quantity": 2
+        },
+        {
+            "id": "product-003",
+            "available_quantity": 0
+        }
+    ],
+    "faults": [
+        "cancel_restores_twice"
+    ]
+}

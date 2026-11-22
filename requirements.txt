@@ -1,0 +1,23 @@
+# prueba con openai
+-e .[openai,app]
+
+# Modelos y agentes
+langchain==1.5.0
+langchain-core==1.8.1
+langchain-openai==1.8.0
+
+# para orquestacion y persistencia
+langgraph==1.2.22
+langgraph-prebuilt==1.1.2
+langgraph-checkpoint==4.3.2
+langgraph-checkpoint-sqlite==3.1.3
+
+# MCP server
+mcp==1.29.0
+
+# conexiones y validacion
+httpx==0.28.1
+pydantic==2.14.3
+
+# interfaz web local
+streamlit==1.67.0
