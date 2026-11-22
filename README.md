@@ -102,13 +102,21 @@ The library never imports the web application; [tests/unit/test_package_boundary
 
    `environment.yml` installs [requirements.txt](requirements.txt), which pins the dependencies and installs this package in editable mode with the `openai` and `app` extras (`pip install -e .[openai,app]`). Streamlit is only needed for the web application.
 
-2. **Add the model credentials.** Credentials are read from a JSON file outside the code, never from environment variables or `.env` files. Create `secrets/openai.json` (the `secrets/` folder is excluded by `.gitignore`):
+2. **Add your OpenAI API key.** Only needed for real investigations (not for the tests, the `controlled` evaluation or `python -m demo`). Create the file `secrets/openai.json` **in the repository root**, next to `README.md`. The `secrets/` folder does not exist in a fresh clone, so create it:
 
-   ```json
-   {"api_key": "sk-..."}
+   ```bash
+   mkdir -p secrets
+   echo '{"api_key": "sk-..."}' > secrets/openai.json
    ```
 
-   [config/application.json](config/application.json) points to it with `"credentials_file": "../secrets/openai.json"`; a relative path is resolved against the configuration file.
+   or in PowerShell:
+
+   ```powershell
+   New-Item -ItemType Directory -Force secrets | Out-Null
+   Set-Content secrets/openai.json '{"api_key": "sk-..."}'
+   ```
+
+   Replace `sk-...` with your key. [config/application.json](config/application.json) and [config/demo.json](config/demo.json) already point to this file (`"credentials_file": "../secrets/openai.json"`, relative to the configuration file), so nothing else needs to change. The key is never read from environment variables or `.env` files. **Do not commit this file.** If it is missing, the run stops with a `FileNotFoundError` that shows the path it expected.
 
 3. **Review the configuration** in [config/application.json](config/application.json):
 

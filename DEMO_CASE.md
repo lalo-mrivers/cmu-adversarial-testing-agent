@@ -82,7 +82,7 @@ A per-response check passes on both applications. Step 8 shows the business cons
 
 ## 4. Run the demo in the web application
 
-Each investigation calls the configured model (about US$0.10 per run with `gpt-6.1-sol`) and takes about two minutes. Setup and credentials are described in the [README](README.md#setup).
+Each investigation calls the configured model (about US$0.10 per run with `gpt-6.1-sol`) and takes about two minutes. **Before you start,** create `secrets/openai.json` with your OpenAI API key, as described in step 2 of the [README setup](README.md#setup). The rest of the setup is there too.
 
 ### 4.1 Start the application
 
